@@ -1,0 +1,108 @@
+The code for the project lies here!!!
+
+
+
+// Lambda Function //
+
+import json
+import boto3
+
+def lambda_handler(event, context):
+    mediaconvert = boto3.client('mediaconvert')
+    mediaconvert_endpoint = mediaconvert.describe_endpoints(MaxResults=1)
+    mediaconvert = boto3.client('mediaconvert', endpoint_url=f"{mediaconvert_endpoint['Endpoints'][0]['Url']}")
+    for message in event['Records']:
+				# REPLACE ME #
+        destination_bucket = 'media-convert-bucket-dev11-destination'
+				##############
+        source_bucket = message['s3']['bucket']['name']
+        object = message['s3']['object']['key']
+        print(object)
+        accountid = context.invoked_function_arn.split(":")[4]
+        region = context.invoked_function_arn.split(":")[3]
+        print(accountid)
+        print(region)
+        with open('job.json') as jsonfile:
+            job_config = json.load(jsonfile)
+            print(job_config)
+
+        job_config['Queue'] = f"arn:aws:mediaconvert:eu-north-1:476114157071:queues/Default"
+        job_config['Role'] = f"arn:aws:iam::476114157071:role/service-role/media-converter-fun-role-qbabln0o"
+        job_config['Settings']['Inputs'][0]['FileInput'] = f"s3://media-convert-bucket-dev11/in/testvideo.mp4"
+        job_config['Settings']['OutputGroups'][0]['OutputGroupSettings']['FileGroupSettings']['Destination'] = f"s3://media-convert-bucket-dev11-destination/"
+
+        response = mediaconvert.create_job(**job_config)
+
+
+
+// JSON CODE //
+{
+    "Queue": "arn:aws:mediaconvert:eu-north-1:476114157071:queues/Default",
+    "Role": "arn:aws:iam::476114157071:role/MediaconvertRole",
+    "Settings": {
+      "TimecodeConfig": {
+        "Source": "ZEROBASED"
+      },
+      "OutputGroups": [
+        {
+          "CustomName": "broadcast-grp-name",
+          "Name": "File Group",
+          "Outputs": [
+            {
+              "ContainerSettings": {
+                "Container": "MP4",
+                "Mp4Settings": {}
+              },
+              "VideoDescription": {
+                "CodecSettings": {
+                  "Codec": "H_264",
+                  "H264Settings": {
+                    "MaxBitrate": 5000000,
+                    "RateControlMode": "QVBR",
+                    "SceneChangeDetect": "TRANSITION_DETECTION"
+                  }
+                }
+              },
+              "AudioDescriptions": [
+                {
+                  "CodecSettings": {
+                    "Codec": "AAC",
+                    "AacSettings": {
+                      "Bitrate": 96000,
+                      "CodingMode": "CODING_MODE_2_0",
+                      "SampleRate": 48000
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "OutputGroupSettings": {
+            "Type": "FILE_GROUP_SETTINGS",
+            "FileGroupSettings": {
+              "Destination": "s3://media-convert-bucket-dev11-destination/"
+            }
+          }
+        }
+      ],
+      "FollowSource": 1,
+      "Inputs": [
+        {
+          "AudioSelectors": {
+            "Audio Selector 1": {
+              "DefaultSelection": "DEFAULT"
+            }
+          },
+          "VideoSelector": {},
+          "TimecodeSource": "ZEROBASED",
+          "FileInput": "s3://media-convert-bucket-dev11/in/testvideo.mp4"
+        }
+      ]
+    },
+    "BillingTagsSource": "JOB",
+    "AccelerationSettings": {
+      "Mode": "DISABLED"
+    },
+    "StatusUpdateInterval": "SECONDS_60",
+    "Priority": 0
+  }
